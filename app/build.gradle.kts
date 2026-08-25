@@ -4,6 +4,7 @@ plugins {
 }
 
 android {
+    // Official Nothing Glyph Matrix SDK AAR from https://github.com/Nothing-Developer-Programme/GlyphMatrix-Developer-Kit
     namespace = "com.example.glyphequalizer"
     compileSdk = 35 // bump to whatever matches Nothing OS 4.x's Android 16 SDK once confirmed
 
@@ -32,11 +33,8 @@ android {
 }
 
 dependencies {
+    implementation(files("libs/glyph-matrix-sdk-2.0.aar"))
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
 
-    // TODO: Add the real Nothing Glyph Developer Kit dependency here once located, e.g.:
-    // implementation("com.nothing.ketchum:glyph-sdk:X.Y.Z")
-    // or as a local .aar under app/libs/ if Nothing distributes it that way instead of Maven.
-    // See README.md "Wiring up the real Glyph SDK" section.
 }

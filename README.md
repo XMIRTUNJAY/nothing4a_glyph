@@ -1,8 +1,7 @@
-# Glyph Equalizer — Nothing Phone (4a)
+# Glyph Equalizer — Nothing Phone (4a) Pro
 
-A music-reactive equalizer for the Nothing Phone (4a)'s Glyph Bar. Splits live audio
-into 7 frequency bands and maps them to the Glyph Bar's 6 controllable white LED zones
-(the 7th LED is a fixed red status light and is intentionally left alone).
+A music-reactive equalizer for the Nothing Phone (4a) Pro's Glyph Matrix. Splits live audio
+into 6 frequency bands and maps them to the Nothing Phone (4a) Pro's 13x13 Glyph Matrix columns.
 
 ## Status
 
@@ -10,33 +9,8 @@ into 7 frequency bands and maps them to the Glyph Bar's 6 controllable white LED
 FFT capture, band-splitting, smoothing, and sensitivity control are all implemented
 and don't depend on anything Nothing-specific — this part will work as-is.
 
-**Glyph hardware binding: stubbed, not yet wired to the real SDK.**
-`GlyphController.kt` contains a `NothingGlyphController` class with TODO-marked stub
-methods instead of real Nothing GDK calls. This was done deliberately rather than
-guessing at method signatures, since the Phone 4a's Glyph Bar API may differ from
-older Glyph Matrix/strip SDK examples found online.
-
-## What you need to do before this runs for real
-
-1. **Find the current Nothing Glyph Developer Kit.**
-   Search "Nothing Glyph Developer Kit GitHub" or check Nothing's developer site.
-   Confirm whether it's a Maven dependency or a local `.aar` file.
-
-2. **Confirm the Phone 4a device constant / zone count.**
-   Public teasers describe 6 white square zones + 1 red LED, but the SDK may address
-   them differently (e.g. as one combined "channel 0-5" or with a device-specific
-   enum). Update `GlyphController.turnOffAll()` and `setAllZones()` if the real
-   zone count or indexing differs from what's assumed here.
-
-3. **Replace the TODO blocks in `GlyphController.kt`** with real GDK calls:
-   - `connect()` → real init/register/openSession sequence
-   - `setZoneBrightness()` / `setAllZones()` → real GlyphFrame builder + toggle call
-   - `disconnect()` → real closeSession/unInit calls
-
-4. **Add the dependency** in `app/build.gradle.kts` where marked.
-
-Everything else (UI, service lifecycle, permission handling, battery cutoff,
-FFT-to-band math) should not need changes once the SDK is wired in.
+**Glyph hardware binding: wired to the official Nothing Glyph Matrix SDK.**
+`GlyphController.kt` now uses `GlyphMatrixManager`, registers `Glyph.DEVICE_25111p`, and sends Phone (4a) Pro 13x13 matrix frames from the live FFT levels with `setAppMatrixFrame`.
 
 ## Permissions explained
 
@@ -52,14 +26,49 @@ FFT-to-band math) should not need changes once the SDK is wired in.
   can't be requested via a runtime dialog — users must enable it manually under
   Settings > Apps > Special access > Notification access.
 
+## Nothing SDK setup
+
+The app expects the official AAR from Nothing's Glyph Matrix Developer Kit at:
+
+```
+app/libs/glyph-matrix-sdk-2.0.aar
+```
+
+Download it from `Nothing-Developer-Programme/GlyphMatrix-Developer-Kit` and keep the manifest `NothingKey` meta-data set. Debug builds use `android:value="test"`; on-device debug mode can be enabled with:
+
+```
+adb shell settings put global nt_glyph_interface_debug_enable 1
+```
+
+## Build and device testing
+
+For Android Studio, import/open the repository root, not just the `app/` directory. Use JDK 17 or 21 in Android Studio (`File > Settings > Build, Execution, Deployment > Build Tools > Gradle > Gradle JDK`). The project cannot complete an Android Studio/Gradle build until the official AAR exists at `app/libs/glyph-matrix-sdk-2.0.aar`.
+
+To test on a Nothing Phone (4a) Pro:
+
+```
+adb shell settings put global nt_glyph_interface_debug_enable 1
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+Then open the app in the foreground, grant the audio permission, start playback in any music app, and toggle Glyph Equalizer on.
+
+If you want a local installable APK from the command line, run:
+
+```
+./scripts/download_nothing_sdk.sh
+JAVA_HOME=/path/to/jdk17 ./scripts/build_debug_apk.sh
+```
+
+The script verifies that `app/libs/glyph-matrix-sdk-2.0.aar` exists before invoking Gradle and prints the generated `app/build/outputs/apk/debug/app-debug.apk` path when the build succeeds.
+
 ## Known limitations
 
 - Glyph must be enabled in system settings (Settings > Glyph Interface) for anything
   to light up, regardless of what this app does.
 - The visualizer auto-stops below 15% battery (configurable in
   `GlyphVisualizerService.LOW_BATTERY_CUTOFF_PERCENT`).
-- Color is not adjustable — the Glyph Bar's LEDs are white-only by hardware design
-  (plus one fixed red status LED), so only brightness/pattern is controllable.
+- Color is not adjustable — the Glyph Matrix LEDs are monochrome, so only brightness/pattern is controllable.
 - `captureSize` is set to the device's max supported value; if this proves too
   CPU-heavy on the Snapdragon 7s Gen 4, drop to a mid-range fixed size (e.g. 1024)
   instead of `getCaptureSizeRange()[1]`.
@@ -70,8 +79,8 @@ FFT-to-band math) should not need changes once the SDK is wired in.
 app/src/main/java/com/example/glyphequalizer/
   MainActivity.kt            - toggle + sensitivity UI
   GlyphVisualizerService.kt  - foreground service, owns the Visualizer lifecycle
-  BandMapper.kt               - FFT -> 7-band brightness math (device-agnostic, done)
-  GlyphController.kt          - Glyph hardware wrapper (STUBBED, needs real SDK)
+  BandMapper.kt               - FFT -> 6-band brightness math for Phone (4a)
+  GlyphController.kt          - official Nothing Glyph SDK wrapper
 app/src/main/res/layout/activity_main.xml
 app/src/main/AndroidManifest.xml
 app/build.gradle.kts

@@ -1,22 +1,14 @@
 package com.example.glyphequalizer
 
+import android.content.ComponentName
 import android.content.Context
 import android.util.Log
+import com.nothing.ketchum.Glyph
+import com.nothing.ketchum.GlyphMatrixManager
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
-/**
- * Thin wrapper around the Nothing Glyph Developer Kit (GDK).
- *
- * IMPORTANT: The exact GDK class/method names below are NOT verified against Nothing's
- * current public SDK for the Phone 4a's Glyph Bar. Method names are written to match the
- * *shape* of Nothing's known GDK pattern (register -> open session -> set channel
- * brightness -> close), based on their publicly documented GDK for older Glyph Matrix
- * devices. Before running this on a real 4a:
- *   1. Pull the actual GDK AAR/repo (search "Nothing Glyph Developer Kit GitHub").
- *   2. Replace the TODO-marked calls below with the real method signatures.
- *   3. Confirm the Phone 4a's 7 zones are addressable individually (vs. only as one bar) -
- *      the public teasers describe 6 square zones + 1 red status LED, so treat 6 as the
- *      controllable equalizer zone count, not 7, until confirmed on-device.
- */
+/** Controls the Nothing Phone (4a) Pro Glyph Matrix through Nothing's official SDK. */
 interface GlyphController {
     fun connect(context: Context): Boolean
     fun setZoneBrightness(zone: Int, brightness: Int)
@@ -28,56 +20,127 @@ interface GlyphController {
 class NothingGlyphController : GlyphController {
 
     private val tag = "GlyphController"
+    private var glyphMatrixManager: GlyphMatrixManager? = null
+    private var callback: GlyphMatrixManager.Callback? = null
     private var connected = false
-
-    // TODO: replace with real GDK object, e.g. `private var glyphManager: GlyphManager? = null`
-    // once the actual SDK is pulled in via build.gradle.
+    private val currentLevels = IntArray(EQUALIZER_BAND_COUNT)
 
     override fun connect(context: Context): Boolean {
+        if (connected) return true
+
+        val manager = GlyphMatrixManager.getInstance(context.applicationContext)
+        val latch = CountDownLatch(1)
+        glyphMatrixManager = manager
+        callback = object : GlyphMatrixManager.Callback {
+            override fun onServiceConnected(componentName: ComponentName) {
+                try {
+                    manager.register(Glyph.DEVICE_25111p)
+                    connected = true
+                    Log.i(tag, "Glyph Matrix SDK connected for Nothing Phone (4a) Pro")
+                } catch (e: Exception) {
+                    connected = false
+                    Log.e(tag, "Failed to register Glyph Matrix SDK", e)
+                } finally {
+                    latch.countDown()
+                }
+            }
+
+            override fun onServiceDisconnected(componentName: ComponentName) {
+                connected = false
+                latch.countDown()
+                Log.w(tag, "Glyph Matrix SDK service disconnected")
+            }
+        }
+
         return try {
-            // TODO: real GDK init sequence looks roughly like:
-            //   GlyphManager.getInstance(context)
-            //   glyphManager.init(callback)
-            //   glyphManager.register(Common.getDevice()) // confirm Phone 4a device constant
-            //   glyphManager.openSession()
-            Log.w(tag, "GDK not wired up yet - stub connect() returning true for dev/testing")
-            connected = true
-            connected
+            manager.init(callback)
+            if (!latch.await(SERVICE_CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                Log.e(tag, "Timed out waiting for Glyph Matrix SDK service")
+                false
+            } else {
+                connected
+            }
         } catch (e: Exception) {
-            Log.e(tag, "Failed to connect to Glyph service", e)
             connected = false
-            connected
+            Log.e(tag, "Failed to initialize Glyph Matrix SDK", e)
+            false
         }
     }
 
     override fun setZoneBrightness(zone: Int, brightness: Int) {
-        if (!connected) return
-        // TODO: real call likely something like:
-        //   val builder = GlyphFrame.Builder()
-        //   builder.buildChannel(zone, brightness)
-        //   glyphManager.toggle(builder.build())
-        Log.d(tag, "STUB setZoneBrightness(zone=$zone, brightness=$brightness)")
+        if (zone !in currentLevels.indices) return
+        currentLevels[zone] = brightness.coerceIn(MIN_BRIGHTNESS, MAX_BRIGHTNESS)
+        setAllZones(currentLevels)
     }
 
     override fun setAllZones(brightness: IntArray) {
         if (!connected) return
-        // Prefer batching all zones into a single GlyphFrame per update rather than
-        // calling setZoneBrightness in a loop, once the real GDK builder API is wired in -
-        // batched updates avoid visible per-zone lag across the bar.
-        for (zone in brightness.indices) {
-            setZoneBrightness(zone, brightness[zone])
+
+        brightness.take(EQUALIZER_BAND_COUNT).forEachIndexed { index, level ->
+            currentLevels[index] = level.coerceIn(MIN_BRIGHTNESS, MAX_BRIGHTNESS)
+        }
+
+        try {
+            glyphMatrixManager?.setAppMatrixFrame(buildEqualizerMatrix(currentLevels))
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to send Glyph Matrix frame", e)
         }
     }
 
     override fun turnOffAll() {
         if (!connected) return
-        setAllZones(IntArray(6)) // 6 controllable equalizer zones; the 7th LED is the
-        // fixed red recording/notification indicator and should not be driven by music.
+        try {
+            currentLevels.fill(MIN_BRIGHTNESS)
+            glyphMatrixManager?.closeAppMatrix()
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to close Glyph Matrix frame", e)
+        }
     }
 
     override fun disconnect() {
-        // TODO: real teardown likely: glyphManager.closeSession(); glyphManager.unInit()
-        Log.d(tag, "STUB disconnect()")
-        connected = false
+        try {
+            if (connected) glyphMatrixManager?.closeAppMatrix()
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to close Glyph Matrix on disconnect", e)
+        } finally {
+            connected = false
+            glyphMatrixManager?.unInit()
+            glyphMatrixManager = null
+            callback = null
+        }
+    }
+
+    private fun buildEqualizerMatrix(levels: IntArray): IntArray {
+        val frame = IntArray(MATRIX_SIDE * MATRIX_SIDE)
+        levels.take(EQUALIZER_BAND_COUNT).forEachIndexed { band, level ->
+            val startX = BAND_COLUMN_RANGES[band].first
+            val endX = BAND_COLUMN_RANGES[band].last
+            val litRows = ((level.coerceIn(MIN_BRIGHTNESS, MAX_BRIGHTNESS) / MAX_BRIGHTNESS.toFloat()) * MATRIX_SIDE)
+                .toInt()
+                .coerceIn(0, MATRIX_SIDE)
+
+            for (x in startX..endX) {
+                for (y in MATRIX_SIDE - litRows until MATRIX_SIDE) {
+                    frame[y * MATRIX_SIDE + x] = level.coerceIn(MIN_BRIGHTNESS, MAX_BRIGHTNESS)
+                }
+            }
+        }
+        return frame
+    }
+
+    private companion object {
+        private const val MATRIX_SIDE = 13
+        private const val EQUALIZER_BAND_COUNT = 6
+        private const val MIN_BRIGHTNESS = 0
+        private const val MAX_BRIGHTNESS = 255
+        private const val SERVICE_CONNECT_TIMEOUT_MS = 2_000L
+        private val BAND_COLUMN_RANGES = listOf(
+            0..1,
+            2..3,
+            4..5,
+            6..7,
+            8..9,
+            10..12,
+        )
     }
 }
