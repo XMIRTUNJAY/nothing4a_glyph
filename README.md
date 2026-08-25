@@ -10,7 +10,7 @@ FFT capture, band-splitting, smoothing, and sensitivity control are all implemen
 and don't depend on anything Nothing-specific — this part will work as-is.
 
 **Glyph hardware binding: wired to the official Nothing Glyph SDK.**
-`GlyphController.kt` now uses `GlyphManager`, registers `Glyph.DEVICE_25111`, opens a Glyph session, and animates the Phone (4a) A1-A6 channel indexes from the live FFT levels. The SDK exposes channel on/off frames rather than per-channel analog brightness, so the equalizer maps brightness to active zones and pulse timing.
+`GlyphController.kt` now uses `GlyphManager`, registers `Glyph.DEVICE_25111`, opens a Glyph session, and toggles the Phone (4a) A1-A6 channel indexes from the live FFT levels. The SDK exposes channel on/off frames rather than per-channel analog brightness, so the equalizer maps brightness to active zones and pulse timing.
 
 ## Permissions explained
 
@@ -39,19 +39,6 @@ Download it from `Nothing-Developer-Programme/Glyph-Developer-Kit` and keep the 
 ```
 adb shell settings put global nt_glyph_interface_debug_enable 1
 ```
-
-## Build and device testing
-
-For Android Studio, import/open the repository root, not just the `app/` directory. Use JDK 17 or 21 in Android Studio (`File > Settings > Build, Execution, Deployment > Build Tools > Gradle > Gradle JDK`). The project cannot complete an Android Studio/Gradle build until the official AAR exists at `app/libs/glyph-matrix-sdk-2.0.aar`.
-
-To test on a Nothing Phone (4a):
-
-```
-adb shell settings put global nt_glyph_interface_debug_enable 1
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-```
-
-Then open the app in the foreground, grant the audio permission, start playback in any music app, and toggle Glyph Equalizer on.
 
 ## Known limitations
 

@@ -104,10 +104,10 @@ class NothingGlyphController : GlyphController {
                 currentLevels.fill(0)
                 glyphManager?.turnOff()
             } else {
-                glyphManager?.animate(frame)
+                glyphManager?.toggle(frame)
             }
         } catch (e: GlyphException) {
-            Log.e(tag, "Failed to animate Glyph channels", e)
+            Log.e(tag, "Failed to update Glyph channels", e)
         }
     }
 
