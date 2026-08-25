@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.glyphequalizer">
+
+    <!-- Required by android.media.audiofx.Visualizer even though we only read system
+         playback data, not the microphone. Explained to the user in-app. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Needed to run the visualizer as a foreground service while music plays. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+
+    <!-- Needed only if/when the real GDK integration requires reading other apps'
+         now-playing metadata via MediaSessionManager. Requires the user to manually
+         grant Notification Access in system settings - cannot be requested via a
+         runtime permission dialog. -->
+    <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+        tools:ignore="ProtectedPermissions" />
+
+    <application
+        android:allowBackup="true"
+        android:label="Glyph Equalizer"
+        android:icon="@mipmap/ic_launcher"
+        android:theme="@style/Theme.AppCompat.Light">
+
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".GlyphVisualizerService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="false" />
+
+    </application>
+
+</manifest>
