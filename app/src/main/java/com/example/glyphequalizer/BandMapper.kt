@@ -5,16 +5,16 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Converts raw FFT bytes from android.media.audiofx.Visualizer into 7 brightness
- * values (0-255), one per Glyph Bar zone, roughly bass -> treble.
+ * Converts raw FFT bytes from android.media.audiofx.Visualizer into 6 brightness
+ * values (0-255), one per Phone (4a) Glyph Bar zone, roughly bass -> treble.
  *
  * Visualizer.getFft() returns interleaved real/imaginary pairs. We compute magnitude
- * per bin, group bins into 7 logarithmically-spaced bands (bass gets more bins than
+ * per bin, group bins into 6 logarithmically-spaced bands (bass gets more bins than
  * treble, matching how music energy is actually distributed), then smooth the result
  * so the LEDs don't flicker on every single audio frame.
  */
 class BandMapper(
-    private val zoneCount: Int = 7,
+    private val zoneCount: Int = 6,
     private val smoothingFactor: Float = 0.55f, // 0 = no smoothing, 1 = frozen
     private val sensitivity: Float = 1.0f        // user-adjustable gain, 0.2 - 3.0
 ) {
@@ -24,7 +24,7 @@ class BandMapper(
 
     /**
      * @param fft raw output of Visualizer.getFft() for the current audio frame
-     * @return brightness values 0-255 for each of the 7 Glyph zones
+     * @return brightness values 0-255 for each of the 6 Phone (4a) Glyph zones
      */
     fun mapFftToZones(fft: ByteArray): IntArray {
         val bandCount = zoneCount
