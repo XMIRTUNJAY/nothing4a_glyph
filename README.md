@@ -1,8 +1,7 @@
 # Glyph Equalizer — Nothing Phone (4a)
 
 A music-reactive equalizer for the Nothing Phone (4a)'s Glyph Bar. Splits live audio
-into 7 frequency bands and maps them to the Glyph Bar's 6 controllable white LED zones
-(the 7th LED is a fixed red status light and is intentionally left alone).
+into 6 frequency bands and maps them to the Nothing Phone (4a) Glyph Bar's A1-A6 channels.
 
 ## Status
 
@@ -10,33 +9,8 @@ into 7 frequency bands and maps them to the Glyph Bar's 6 controllable white LED
 FFT capture, band-splitting, smoothing, and sensitivity control are all implemented
 and don't depend on anything Nothing-specific — this part will work as-is.
 
-**Glyph hardware binding: stubbed, not yet wired to the real SDK.**
-`GlyphController.kt` contains a `NothingGlyphController` class with TODO-marked stub
-methods instead of real Nothing GDK calls. This was done deliberately rather than
-guessing at method signatures, since the Phone 4a's Glyph Bar API may differ from
-older Glyph Matrix/strip SDK examples found online.
-
-## What you need to do before this runs for real
-
-1. **Find the current Nothing Glyph Developer Kit.**
-   Search "Nothing Glyph Developer Kit GitHub" or check Nothing's developer site.
-   Confirm whether it's a Maven dependency or a local `.aar` file.
-
-2. **Confirm the Phone 4a device constant / zone count.**
-   Public teasers describe 6 white square zones + 1 red LED, but the SDK may address
-   them differently (e.g. as one combined "channel 0-5" or with a device-specific
-   enum). Update `GlyphController.turnOffAll()` and `setAllZones()` if the real
-   zone count or indexing differs from what's assumed here.
-
-3. **Replace the TODO blocks in `GlyphController.kt`** with real GDK calls:
-   - `connect()` → real init/register/openSession sequence
-   - `setZoneBrightness()` / `setAllZones()` → real GlyphFrame builder + toggle call
-   - `disconnect()` → real closeSession/unInit calls
-
-4. **Add the dependency** in `app/build.gradle.kts` where marked.
-
-Everything else (UI, service lifecycle, permission handling, battery cutoff,
-FFT-to-band math) should not need changes once the SDK is wired in.
+**Glyph hardware binding: wired to the official Nothing Glyph SDK.**
+`GlyphController.kt` now uses `GlyphManager`, registers `Glyph.DEVICE_25111`, opens a Glyph session, and toggles the Phone (4a) A1-A6 channel indexes from the live FFT levels. The SDK exposes channel on/off frames rather than per-channel analog brightness, so the equalizer maps brightness to active zones and pulse timing.
 
 ## Permissions explained
 
@@ -51,6 +25,20 @@ FFT-to-band math) should not need changes once the SDK is wired in.
   `Visualizer(0)` global-mix approach, but declared for future use. This permission
   can't be requested via a runtime dialog — users must enable it manually under
   Settings > Apps > Special access > Notification access.
+
+## Nothing SDK setup
+
+The app expects the official AAR from Nothing's Glyph Developer Kit at:
+
+```
+app/libs/glyph-matrix-sdk-2.0.aar
+```
+
+Download it from `Nothing-Developer-Programme/Glyph-Developer-Kit` and keep the manifest `NothingKey` meta-data set. Debug builds use `android:value="test"`; on-device debug mode can be enabled with:
+
+```
+adb shell settings put global nt_glyph_interface_debug_enable 1
+```
 
 ## Known limitations
 
@@ -70,8 +58,8 @@ FFT-to-band math) should not need changes once the SDK is wired in.
 app/src/main/java/com/example/glyphequalizer/
   MainActivity.kt            - toggle + sensitivity UI
   GlyphVisualizerService.kt  - foreground service, owns the Visualizer lifecycle
-  BandMapper.kt               - FFT -> 7-band brightness math (device-agnostic, done)
-  GlyphController.kt          - Glyph hardware wrapper (STUBBED, needs real SDK)
+  BandMapper.kt               - FFT -> 6-band brightness math for Phone (4a)
+  GlyphController.kt          - official Nothing Glyph SDK wrapper
 app/src/main/res/layout/activity_main.xml
 app/src/main/AndroidManifest.xml
 app/build.gradle.kts
